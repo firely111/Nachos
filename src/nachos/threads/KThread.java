@@ -190,31 +190,16 @@ public class KThread {
 
 	Lib.assertTrue(toBeDestroyed == null);
 	toBeDestroyed = currentThread;
-	
-	KThread finishThread= currentThread.queue.nextThread();
-  if(finishThread!= null){
-    finishThread.ready(); 
-  }
+        
+        //***
+        currentThread.conditionLock.acquire();
+        currentThread.conditionVar.wake();
+        currentThread.conditionLock.release();
+        //***
 
 	currentThread.status = statusFinished;
 	
 	sleep();
-	/*joinLock.acquire();
-  KThread thread = currentThread.queue.nextThread();
-  while(thread != null){
-    currentThread.queue.acquire(thread);
-    thread = currentThread.queue.nextThread();
-  }
-  currentThread.isFinished.wakeAll();
-  currentThread.queue = null;
-  joinLock.release();
-  
-  currentThread.status = statusFinished;
-  
-  Machine.interrupt().disable();
-  
-  sleep();*/
-	
     }
 
     /**
@@ -296,42 +281,14 @@ public class KThread {
 	Lib.debug(dbgThread, "Joining to thread: " + toString());
 
 	Lib.assertTrue(this != currentThread);
-	
-	Machine.interrupt().disable();
-	
-	if(currentThread.equals(isJoined) || status== statusFinished){
-	  Machine.interrupt().enable();
-	  return;
-	}
-	else{
-	  this.queue.waitForAccess(currentThread);
-	  isJoined= true;
-	  currentThread.sleep();  
-	}
-	
-	/*if(queue== null){
-	  queue.waitForAccess(currentThread);
-	}
-	
-	if(currentThread.equals(isJoined) && status== statusFinished){
-	  queue.waitForAccess(currentThread);
-	  currentThread.sleep();
-	}*/
-	
-	/*joinLock.acquire();
-  if(status == statusFinished){
-    joinLock.release();
-  }
-  else{
-    Machine.interrupt().disable();
-    this.queue.waitForAccess(currentThread);
-    Machine.interrupt().enable();
-    isFinished.sleep();
-    joinLock.release();
-  }*/
-	
-	Machine.interrupt().enable();
-
+        
+        //***
+        if(status != statusFinished) {
+            conditionLock.acquire();
+            conditionVar.sleep();
+            conditionLock.release();
+        }
+        //***
     }
 
     /**
@@ -499,8 +456,10 @@ public class KThread {
     private static KThread currentThread = null;
     private static KThread toBeDestroyed = null;
     private static KThread idleThread = null;
-    private ThreadQueue queue= ThreadedKernel.scheduler.newThreadQueue(true);
-    private boolean isJoined= false;
-    private Condition2 isFinished;
-    private static Lock joinLock = new Lock();
+    
+    //***
+    private Lock conditionLock = new Lock();
+    private Condition2 conditionVar = new Condition2(conditionLock);
+    //private ThreadQueue waitQueue = ThreadedKernel.scheduler.newThreadQueue(false);
+    //***
 }
